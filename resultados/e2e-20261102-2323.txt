@@ -1,0 +1,320 @@
+VagaCerta: teste de ponta a ponta  2026-11-02 23:23  (a2fade7)
+
+== Build e arranque
+ Image vagacerta/utentes:0.1 Building 
+ Image vagacerta/agenda:0.1 Building 
+ Image vagacerta/notificacoes:0.1 Building 
+ Image vagacerta/marcacoes:0.1 Building 
+#1 [internal] load local bake definitions
+#1 reading from stdin 2.05kB done
+#1 DONE 0.0s
+
+#2 [utentes internal] load build definition from Dockerfile
+#2 transferring dockerfile: 206B done
+#2 DONE 0.0s
+
+#3 [notificacoes internal] load build definition from Dockerfile
+#3 transferring dockerfile: 206B done
+#3 DONE 0.0s
+
+#4 [agenda internal] load build definition from Dockerfile
+#4 transferring dockerfile: 206B done
+#4 DONE 0.0s
+
+#5 [marcacoes internal] load build definition from Dockerfile
+#5 transferring dockerfile: 206B done
+#5 DONE 0.0s
+
+#6 [agenda internal] load metadata for docker.io/library/node:22-alpine
+#6 DONE 0.0s
+
+#7 [marcacoes internal] load .dockerignore
+#7 transferring context: 97B done
+#7 DONE 0.0s
+
+#8 [agenda internal] load .dockerignore
+#8 transferring context: 97B done
+#8 DONE 0.0s
+
+#9 [notificacoes internal] load .dockerignore
+#9 transferring context: 97B done
+#9 DONE 0.0s
+
+#10 [utentes internal] load .dockerignore
+#10 transferring context: 97B done
+#10 DONE 0.0s
+
+#11 [agenda internal] load build context
+#11 transferring context: 157B done
+#11 DONE 0.0s
+
+#12 [notificacoes 1/5] FROM docker.io/library/node:22-alpine@sha256:fe4f6d74e20370acb04ad889077d14d0f64a9c8ea6a42bc60cddf1e844699914
+#12 resolve docker.io/library/node:22-alpine@sha256:fe4f6d74e20370acb04ad889077d14d0f64a9c8ea6a42bc60cddf1e844699914 0.0s done
+#12 resolve docker.io/library/node:22-alpine@sha256:fe4f6d74e20370acb04ad889077d14d0f64a9c8ea6a42bc60cddf1e844699914 0.0s done
+#12 DONE 0.0s
+
+#13 [marcacoes internal] load build context
+#13 transferring context: 223B done
+#13 DONE 0.0s
+
+#14 [notificacoes internal] load build context
+#14 transferring context: 188B done
+#14 DONE 0.0s
+
+#15 [utentes internal] load build context
+#15 transferring context: 157B done
+#15 DONE 0.0s
+
+#16 [agenda 3/5] COPY package*.json ./
+#16 CACHED
+
+#17 [agenda 4/5] RUN npm ci --omit=dev
+#17 CACHED
+
+#18 [marcacoes 4/5] RUN npm ci --omit=dev
+#18 CACHED
+
+#19 [marcacoes 3/5] COPY package*.json ./
+#19 CACHED
+
+#20 [notificacoes 4/5] RUN npm ci --omit=dev
+#20 CACHED
+
+#21 [notificacoes 3/5] COPY package*.json ./
+#21 CACHED
+
+#22 [utentes 3/5] COPY package*.json ./
+#22 CACHED
+
+#23 [agenda 2/5] WORKDIR /app
+#23 CACHED
+
+#24 [utentes 4/5] RUN npm ci --omit=dev
+#24 CACHED
+
+#25 [agenda 5/5] COPY src ./src
+#25 CACHED
+
+#26 [utentes 5/5] COPY src ./src
+#26 CACHED
+
+#27 [marcacoes 5/5] COPY src ./src
+#27 CACHED
+
+#28 [notificacoes 5/5] COPY src ./src
+#28 CACHED
+
+#29 [marcacoes] exporting to image
+#29 exporting layers done
+#29 exporting manifest sha256:e89c3adb39e26b027222fee5a91ecb8e71b7153b78605bcd247b42cf4f120930 done
+#29 exporting config sha256:60b02f797936d98128d8458766e2842302c69c6a28098f0bde0d28c873d7cd11 0.0s done
+#29 exporting attestation manifest sha256:03c5d038212915b2cd7d3d177ce4d2293f4f68578c275b30556c2f7f1e58ac51
+#29 ...
+
+#30 [agenda] exporting to image
+#30 exporting layers done
+#30 exporting manifest sha256:7dc697dd0dc35a2cab5c09b476a75a5799833f3521234c071139344c915d2404 done
+#30 exporting config sha256:d9022835ecb3b6fb3fab8378b8decf6e7120214e595f833845d79df3f1973ed1 done
+#30 exporting attestation manifest sha256:73e9f91a653213f98398cc004ee28bfe1e50346eb4c0db90c315dec11bbd0f45 0.0s done
+#30 exporting manifest list sha256:ee697eddb4678c163b53bee46eac60e542fc2a0c0e18847bf2719fd5d2b72407 0.0s done
+#30 naming to docker.io/vagacerta/agenda:0.1 0.0s done
+#30 unpacking to docker.io/vagacerta/agenda:0.1 0.0s done
+#30 DONE 0.2s
+
+#29 [marcacoes] exporting to image
+#29 exporting attestation manifest sha256:03c5d038212915b2cd7d3d177ce4d2293f4f68578c275b30556c2f7f1e58ac51 0.0s done
+#29 exporting manifest list sha256:7e259269037ebf2099b87b4b054d7d63b2805b88bfd0627079eefe4e50aed38a 0.0s done
+#29 naming to docker.io/vagacerta/marcacoes:0.1 done
+#29 unpacking to docker.io/vagacerta/marcacoes:0.1 0.0s done
+#29 DONE 0.2s
+
+#31 [utentes] exporting to image
+#31 exporting layers done
+#31 exporting manifest sha256:2bc203be34e9dd24a82c6d6da57d3c2e7001ea31e2eb95e93ffbd5812ae4ffab done
+#31 exporting config sha256:08fe759f8a4e94398195ea5a038dd4ec8d70c996650c64e4810331223e6266d8 done
+#31 exporting attestation manifest sha256:2f8ba198b1c99d8e1dfb51eee3611b80b4c31fe2d36bfd5adc20e85b85268355 0.1s done
+#31 exporting manifest list sha256:1b17d4beb02657ae088f35f5767bb184f0757b0202bb09318e6d642abd2a6259 0.0s done
+#31 naming to docker.io/vagacerta/utentes:0.1 done
+#31 unpacking to docker.io/vagacerta/utentes:0.1 0.0s done
+#31 DONE 0.2s
+
+#32 [notificacoes] exporting to image
+#32 exporting layers done
+#32 exporting manifest sha256:02167e00d7b3ef8444885809e999a5deb9e0814eee56aa2aa2f04ab3f7c590de 0.0s done
+#32 exporting config sha256:7e79014d170e529eff23c8c5edf88d68eaae0bdf676cab334083d3bf6ec53e11 done
+#32 exporting attestation manifest sha256:ae1cb7f90a1bd2f87264a5b9c5f0213967f1f15a58e6d55aec1c92325e546639 0.0s done
+#32 exporting manifest list sha256:c9f2593b6d088c6ba78c2be7eef21a436bee3cf342f1c803457b54e750a2f4a0 0.0s done
+#32 naming to docker.io/vagacerta/notificacoes:0.1 done
+#32 unpacking to docker.io/vagacerta/notificacoes:0.1 0.0s done
+#32 DONE 0.2s
+
+#33 [agenda] resolving provenance for metadata file
+#33 DONE 0.1s
+
+#34 [notificacoes] resolving provenance for metadata file
+#34 DONE 0.0s
+
+#35 [utentes] resolving provenance for metadata file
+#35 DONE 0.1s
+
+#36 [marcacoes] resolving provenance for metadata file
+#36 DONE 0.0s
+ Image vagacerta/agenda:0.1 Built 
+ Image vagacerta/utentes:0.1 Built 
+ Image vagacerta/marcacoes:0.1 Built 
+ Image vagacerta/notificacoes:0.1 Built 
+ Volume vagacerta-volume-rabbitmq Creating 
+ Volume vagacerta-volume-rabbitmq Creating 
+ Volume vagacerta-volume-sqlserver Creating 
+ Volume vagacerta-volume-sqlserver Creating 
+ Volume vagacerta-volume-postgres Creating 
+ Volume vagacerta-volume-postgres Creating 
+ Network vagacerta-rede Creating 
+ Network vagacerta-rede Creating 
+ Volume vagacerta-volume-rabbitmq Created 
+ Volume vagacerta-volume-rabbitmq Created 
+ Volume vagacerta-volume-sqlserver Created 
+ Volume vagacerta-volume-sqlserver Created 
+ Volume vagacerta-volume-postgres Created 
+ Volume vagacerta-volume-postgres Created 
+ Network vagacerta-rede Created 
+ Network vagacerta-rede Created 
+ Container vagacerta-dados-postgres Creating 
+ Container vagacerta-dados-sqlserver Creating 
+ Container vagacerta-fila-rabbitmq Creating 
+ Container vagacerta-dados-sqlserver Created 
+ Container vagacerta-servico-utentes Creating 
+ Container vagacerta-dados-postgres Created 
+ Container vagacerta-servico-agenda Creating 
+ Container vagacerta-fila-rabbitmq Created 
+ Container vagacerta-servico-notificacoes Creating 
+ Container vagacerta-servico-utentes Created 
+ Container vagacerta-servico-agenda Created 
+ Container vagacerta-servico-marcacoes Creating 
+ Container vagacerta-servico-notificacoes Created 
+ Container vagacerta-servico-marcacoes Created 
+ Container vagacerta-entrada-gateway Creating 
+ Container vagacerta-entrada-gateway Created 
+ Container vagacerta-dados-sqlserver Starting 
+ Container vagacerta-dados-postgres Starting 
+ Container vagacerta-fila-rabbitmq Starting 
+ Container vagacerta-dados-sqlserver Started 
+ Container vagacerta-servico-utentes Starting 
+ Container vagacerta-dados-postgres Started 
+ Container vagacerta-dados-postgres Waiting 
+ Container vagacerta-fila-rabbitmq Started 
+ Container vagacerta-dados-postgres Waiting 
+ Container vagacerta-fila-rabbitmq Waiting 
+ Container vagacerta-servico-utentes Started 
+ Container vagacerta-dados-postgres Healthy 
+ Container vagacerta-dados-postgres Healthy 
+ Container vagacerta-servico-agenda Starting 
+ Container vagacerta-servico-agenda Started 
+ Container vagacerta-dados-postgres Waiting 
+ Container vagacerta-servico-agenda Waiting 
+ Container vagacerta-servico-utentes Waiting 
+ Container vagacerta-dados-postgres Healthy 
+ Container vagacerta-fila-rabbitmq Healthy 
+ Container vagacerta-servico-notificacoes Starting 
+ Container vagacerta-servico-notificacoes Started 
+ Container vagacerta-servico-utentes Healthy 
+ Container vagacerta-servico-agenda Healthy 
+ Container vagacerta-servico-marcacoes Starting 
+ Container vagacerta-servico-marcacoes Started 
+ Container vagacerta-servico-marcacoes Waiting 
+ Container vagacerta-servico-agenda Waiting 
+ Container vagacerta-servico-agenda Healthy 
+ Container vagacerta-servico-marcacoes Healthy 
+ Container vagacerta-entrada-gateway Starting 
+ Container vagacerta-entrada-gateway Started 
+ Container vagacerta-dados-postgres Waiting 
+ Container vagacerta-fila-rabbitmq Waiting 
+ Container vagacerta-entrada-gateway Waiting 
+ Container vagacerta-servico-notificacoes Waiting 
+ Container vagacerta-servico-utentes Waiting 
+ Container vagacerta-dados-sqlserver Waiting 
+ Container vagacerta-servico-marcacoes Waiting 
+ Container vagacerta-servico-agenda Waiting 
+ Container vagacerta-dados-sqlserver Healthy 
+ Container vagacerta-entrada-gateway Healthy 
+ Container vagacerta-servico-marcacoes Healthy 
+ Container vagacerta-dados-postgres Healthy 
+ Container vagacerta-servico-agenda Healthy 
+ Container vagacerta-servico-utentes Healthy 
+ Container vagacerta-fila-rabbitmq Healthy 
+ Container vagacerta-servico-notificacoes Healthy 
+pronto em 17 s
+NAME                             IMAGE                                        STATUS
+vagacerta-dados-postgres         postgres:17-alpine                           Up 15 seconds (healthy)
+vagacerta-dados-sqlserver        mcr.microsoft.com/mssql/server:2022-latest   Up 15 seconds
+vagacerta-entrada-gateway        nginx:alpine                                 Up Less than a second
+vagacerta-fila-rabbitmq          rabbitmq:4-management-alpine                 Up 15 seconds (healthy)
+vagacerta-servico-agenda         vagacerta/agenda:0.1                         Up 11 seconds (healthy)
+vagacerta-servico-marcacoes      vagacerta/marcacoes:0.1                      Up 5 seconds (healthy)
+vagacerta-servico-notificacoes   vagacerta/notificacoes:0.1                   Up 9 seconds (healthy)
+vagacerta-servico-utentes        vagacerta/utentes:0.1                        Up 15 seconds (healthy)
+
+== Teste funcional
+
+1. Arranque
+  ✓ gateway e os 4 serviços respondem /ready  — gateway, agenda, marcacoes, utentes, notificacoes
+
+2. Consultar vagas (RF1)
+  ✓ GET /agenda devolve as vagas livres do dia  — Cardiologia: 16 livres; vaga escolhida V-2026-12-02-CARD-0800
+  ✓ pedido inválido em /agenda dá 400
+
+3. Validações da marcação
+  ✓ sem Idempotency-Key dá 400
+  ✓ utente inexistente dá 422
+  ✓ vaga inexistente dá 404
+
+4. Marcar (RF2)
+  ✓ POST /marcacoes dá 201 e a marcação fica confirmada  — marcação 6e42ba38 em 30 ms
+  ✓ a agenda tem a vaga marcada por esta marcação  — livres 16 → 15
+
+5. Idempotência
+  ✓ repetir o pedido com a mesma chave devolve a mesma marcação
+  ✓ reutilizar a chave noutro pedido dá 422
+  ✓ 20 pedidos simultâneos com a mesma chave criam uma só marcação  — 20×201, 1 marcação (V-2026-12-02-CARD-0845)
+
+6. Confirmação por SMS (RF4, RNF4)
+  ✓ o SMS chega uma vez através do RabbitMQ  — "Consulta marcada: vaga V-2026-12-02-CARD-0800. Ref 6e42ba38." (4 ms)
+
+7. Concorrência (RNF1): 100 utentes na mesma vaga ao mesmo tempo
+  ✓ exatamente um 201, os restantes 409, nenhum 5xx  — 1×201, 99×409 em 459 ms (p95 436 ms)
+  ✓ auditoria: nenhuma vaga com duas marcações  — 3 confirmadas, 101 rejeitadas, 0 duplicadas
+
+8. Desmarcar (RF3)
+  ✓ DELETE /marcacoes/:id cancela e devolve a vaga a livre  — livres 13 → 14
+  ✓ desmarcar outra vez é inofensivo (200)
+  ✓ a vaga libertada pode ser marcada por outro utente
+
+9. Fecho
+  ✓ SMS sem duplicados: um por marcação confirmada  — 4 SMS novos para 4 marcações
+
+18/18 passos OK
+
+== Resiliência: RabbitMQ parado
+rabbitmq parado
+
+E5 (versão curta): marcar com o RabbitMQ parado
+  ✓ a marcação responde 201 sem RabbitMQ  — marcação 855dbe9e em 23 ms, fica no outbox
+  ✓ a marcação fica por notificar no outbox  — por_notificar = 1
+
+2/2 passos OK
+rabbitmq a arrancar
+
+E5 (versão curta): depois de o RabbitMQ voltar
+  ✓ o outbox republica e o SMS chega  — SMS entregue 6.1 s depois de o RabbitMQ voltar
+  ✓ outbox vazio
+
+2/2 passos OK
+
+== Erros nos registos dos serviços
+  agenda: 0
+  marcacoes: 0
+  utentes: 0
+  notificacoes: 0
+
+== Resultado: TODAS AS FASES PASSARAM
+relatório: resultados/e2e-20261102-2323.txt

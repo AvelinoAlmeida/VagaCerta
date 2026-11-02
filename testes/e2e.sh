@@ -11,7 +11,7 @@ mkdir -p resultados
 exec > >(tee "$relatorio") 2>&1
 
 node_teste() {
-  docker run --rm --network vagacerta_default \
+  docker run --rm --name vagacerta-teste-e2e --network vagacerta-rede \
     -v "$PWD/testes:/testes:ro" -v "$PWD/resultados:/resultados" -u "$(id -u):$(id -g)" \
     node:22-alpine node /testes/e2e.mjs "$@"
 }
@@ -25,7 +25,7 @@ if ! docker compose up -d --build --wait --wait-timeout 300; then
   echo "o Compose não ficou saudável:"; docker compose ps; docker compose logs --tail 30; exit 1
 fi
 echo "pronto em $((SECONDS - t0)) s"
-docker compose ps --format 'table {{.Service}}\t{{.Image}}\t{{.Status}}'
+docker compose ps --format 'table {{.Name}}\t{{.Image}}\t{{.Status}}'
 
 falhas=0
 echo -e "\n== Teste funcional"

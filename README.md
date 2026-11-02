@@ -1,54 +1,168 @@
 # VagaCerta
 
-**Marcação de consultas distribuída sob pico de procura**
+**Marcação de consultas distribuída, preparada para o pico de procura.**
 
-Trabalho prático de Computação Distribuída e em Nuvem · MEI · ESTG P.PORTO · 2026/27
-Avelino Almeida · Docente: Ricardo Costa · Defesa: 16/12/2026
+Numa unidade de saúde, as vagas de consulta do dia abrem às 08:00 e, nesse minuto, milhares de utentes tentam marcar ao mesmo tempo. A VagaCerta é uma plataforma de marcação (fictícia) desenhada para esse momento:
 
-## O problema
+- **aguenta o pico** — serviços sem estado, que escalam horizontalmente;
+- **nunca dá a mesma vaga a duas pessoas** — a reserva é decidida por um único `UPDATE` condicional;
+- **não perde confirmações** — cada marcação gera um SMS, entregue pelo menos uma vez e sem duplicados;
+- **protege os dados pessoais** — só um serviço tem acesso à base de dados dos utentes.
 
-Numa unidade de saúde, as vagas de consulta do dia abrem às 08:00. Nesse minuto, milhares de utentes tentam marcar ao mesmo tempo. O sistema tem de:
-
-- aguentar o pico;
-- nunca dar a mesma vaga a duas pessoas (uma vaga marcada duas vezes é um utente mandado embora no balcão);
-- confirmar cada marcação (uma confirmação perdida é uma consulta faltada);
-- proteger os dados pessoais dos utentes.
-
-A VagaCerta é uma plataforma fictícia que serve de caso de estudo para os temas T01 a T06 da unidade curricular. A lógica de negócio é mínima: o trabalho está em montar, configurar, operar e medir a infraestrutura.
-
-Cada vaga tem um identificador (por exemplo `V-2026-12-02-CARD-0815`) e um estado: `livre`, `marcada` ou `cancelada`. Especialidades: Cardiologia, Medicina Geral e Familiar, Ortopedia e Oftalmologia.
+A lógica de negócio é propositadamente mínima: o foco está na infraestrutura — como se monta, configura, opera e mede.
 
 ## Arquitetura
 
-Tudo corre num cluster k3d local (1 server + 2 agents), no namespace `vagacerta`.
-
-| Componente | Papel | Réplicas |
-|---|---|---|
-| Ingress (Traefik) | Entrada: `POST /marcacoes`, `GET /agenda` | — |
-| `marcacoes` | Orquestra a marcação: valida o utente, reserva na agenda, publica a confirmação | HPA 2–6 |
-| `agenda` | Vagas: única fonte de verdade | HPA 2–6 |
-| `utentes` | Dados pessoais | 2 |
-| `notificacoes` | Consome a fila e envia o SMS (simulado) | 1–2 |
-| Postgres primário + réplica | Escritas no primário; consulta de disponibilidade na réplica | 1 + 1 |
-| SQL Server 2022 | Base de dados dos utentes, numa zona de rede isolada | 1 |
-| RabbitMQ | Fila durável `marcacao.criada` | 1 |
-| Prometheus, Grafana, Alertmanager, `sql_exporter` | Métricas, painéis, alertas do SLO e saúde do SQL Server | — |
-
-Uma marcação, do clique ao SMS:
-
 ```
-Utente ─POST /marcacoes (Idempotency-Key)─► marcacoes ─GET─► utentes ─► SQL Server
-                                               │
-                                               ├─POST /vagas/{id}/reservar─► agenda ─► Postgres primário
-                                               │  timeout 300 ms · 2 retries      UPDATE vagas SET estado='marcada'
-                                               │  com jitter                      WHERE id=$1 AND estado='livre'
-                                               │                                  (0 linhas → 409 vaga ocupada)
-                                               ├─publica marcacao.criada─► RabbitMQ ─► notificacoes (dedup por id)
-                                               ▼
-                                      201 Created ao utente
+                    ┌──────────────┐
+  Utente ── HTTP ──►│   gateway    │  GET /agenda · POST /marcacoes
+                    └──┬────────┬──┘
+                       │        │
+              ┌────────▼──┐  ┌──▼──────────┐  GET /utentes/:n  ┌───────────┐     ┌────────────┐
+              │  agenda   │◄─┤  marcacoes  ├──────────────────►│  utentes  ├────►│ SQL Server │
+              └─────┬─────┘  └──┬───────┬──┘                   └───────────┘     └────────────┘
+                    │           │       │ marcacao.criada
+                    │           │       ▼
+              ┌─────▼───────────▼┐  ┌──────────┐   ┌──────────────┐
+              │     Postgres     │  │ RabbitMQ ├──►│ notificacoes │──► SMS (simulado)
+              └──────────────────┘  └──────────┘   └──────────────┘
 ```
 
-O `UPDATE` condicional garante que só um pedido muda a vaga de `livre` para `marcada`. A chave de idempotência garante que os retries não marcam duas vezes. A confirmação é assíncrona: se o RabbitMQ ou as notificações falharem, a marcação continua a funcionar.
+| Componente | Papel |
+|---|---|
+| `gateway` | Ponto de entrada. No Compose é um nginx; no Kubernetes, o Ingress (Traefik). |
+| `agenda` | Vagas de consulta: a única fonte de verdade sobre quem tem cada vaga. |
+| `marcacoes` | Orquestra a marcação: valida o utente, reserva a vaga, publica a confirmação. |
+| `utentes` | Dados pessoais dos utentes, no SQL Server. |
+| `notificacoes` | Consome a fila `marcacao.criada` e envia o SMS de confirmação. |
+| Postgres | Uma base de dados por serviço (`agenda`, `marcacoes`, `notificacoes`). |
+| SQL Server 2022 | Base de dados `utentes`, acessível apenas ao serviço `utentes`. |
+| RabbitMQ | Fila durável `marcacao.criada`, com dead-letter queue. |
+
+Cada vaga tem um identificador legível — `V-<dia>-<especialidade>-<hora>`, por exemplo `V-2026-12-02-CARD-0815` — e um estado: `livre`, `marcada` ou `cancelada`. Especialidades: `CARD` Cardiologia, `MGF` Medicina Geral e Familiar, `ORTO` Ortopedia, `OFT` Oftalmologia.
+
+## Como funciona uma marcação
+
+```
+POST /marcacoes  (Idempotency-Key: <uuid>)  {"utente": "100000001", "vagaId": "V-2026-12-02-CARD-0815"}
+
+marcacoes ─1─► grava a chave com um marcacaoId novo (estado pendente)
+          ─2─► utentes   GET /utentes/100000001                              404 → 422
+          ─3─► agenda    POST /vagas/{id}/reservar  timeout 300 ms, 2 retries com jitter
+                           UPDATE vagas SET estado='marcada' WHERE id=$1 AND estado='livre'
+                           0 linhas → 409 vaga ocupada
+          ─4─► confirma a marcação e publica marcacao.criada ─► RabbitMQ ─► notificacoes
+          ◄─── 201 Created
+```
+
+As garantias vêm de três mecanismos simples:
+
+| Garantia | Mecanismo |
+|---|---|
+| Uma vaga, uma pessoa | O `UPDATE ... WHERE estado='livre'` é atómico: com 100 pedidos simultâneos, só um muda a linha. |
+| Retries sem duplicar | A `Idempotency-Key` fica gravada antes de se chamar a agenda; o mesmo `marcacaoId` segue em todas as tentativas, e a agenda reconhece-o. |
+| Confirmação garantida | Outbox: a marcação fica `notificada=false` até o RabbitMQ confirmar a mensagem. Se o RabbitMQ estiver em baixo, a marcação responde 201 na mesma e um ciclo de fundo republica-a quando ele voltar. |
+| SMS sem duplicados | O consumidor regista cada `marcacaoId` com `ON CONFLICT DO NOTHING`; mensagens repetidas são ignoradas. |
+
+## Começar
+
+Requisitos: Docker com Compose v2. Não é preciso Node.js instalado.
+
+```bash
+docker compose up -d --build --wait      # ~20 s depois do primeiro build
+```
+
+| O quê | Onde |
+|---|---|
+| API | http://localhost:8081 |
+| Consola do RabbitMQ | http://localhost:15672 (`app` / `app`) |
+
+No arranque, a agenda cria as vagas de 02/12/2026 e 03/12/2026 (4 especialidades × 16 horários, das 08:00 às 11:45) e o serviço `utentes` cria 1000 utentes fictícios, de `100000001` a `100001000`.
+
+```bash
+# vagas livres
+curl 'http://localhost:8081/agenda?especialidade=CARD&dia=2026-12-02'
+
+# marcar
+curl -X POST http://localhost:8081/marcacoes -H 'content-type: application/json' \
+     -H "Idempotency-Key: $(uuidgen)" -d '{"utente":"100000001","vagaId":"V-2026-12-02-CARD-0815"}'
+
+# desmarcar
+curl -X DELETE http://localhost:8081/marcacoes/<id>
+
+docker compose down -v                   # para tudo e apaga os dados
+```
+
+### Contentores
+
+Os nomes seguem o padrão `vagacerta-<camada>-<nome>`, para se perceber logo o papel de cada um em `docker ps`:
+
+| Camada | Contentor | Imagem | Porta interna |
+|---|---|---|---|
+| entrada | `vagacerta-entrada-gateway` | `nginx:alpine` | 8080 (exposta em 8081) |
+| serviço | `vagacerta-servico-agenda` | `vagacerta/agenda:0.1` | 3001 |
+| serviço | `vagacerta-servico-marcacoes` | `vagacerta/marcacoes:0.1` | 3002 |
+| serviço | `vagacerta-servico-utentes` | `vagacerta/utentes:0.1` | 3003 |
+| serviço | `vagacerta-servico-notificacoes` | `vagacerta/notificacoes:0.1` | 3004 |
+| dados | `vagacerta-dados-postgres` | `postgres:17-alpine` | 5432 |
+| dados | `vagacerta-dados-sqlserver` | `mssql/server:2022-latest` | 1433 |
+| fila | `vagacerta-fila-rabbitmq` | `rabbitmq:4-management-alpine` | 5672 (consola em 15672) |
+
+Volumes `vagacerta-volume-postgres`, `vagacerta-volume-sqlserver`, `vagacerta-volume-rabbitmq`; rede `vagacerta-rede`. Dentro da rede, os serviços chamam-se pelo nome curto (`agenda`, `postgres`, …), tal como no Kubernetes.
+
+## API
+
+Pela gateway:
+
+| Método | Caminho | Descrição | Respostas |
+|---|---|---|---|
+| `GET` | `/agenda?especialidade=CARD&dia=2026-12-02` | Vagas livres de uma especialidade num dia | 200, 400 |
+| `POST` | `/marcacoes` | Marca uma vaga. Corpo `{utente, vagaId}`, cabeçalho `Idempotency-Key` obrigatório | 201, 400, 404 vaga, 409 ocupada, 422 utente/chave, 503 |
+| `GET` | `/marcacoes/:id` | Estado de uma marcação | 200, 404 |
+| `DELETE` | `/marcacoes/:id` | Desmarca e devolve a vaga a livre (idempotente) | 200, 404, 409 |
+
+Repetir um `POST` com a mesma chave devolve a resposta original, com o cabeçalho `idempotent-replayed: true`.
+
+Internas (só dentro da rede):
+
+| Serviço | Rotas |
+|---|---|
+| `agenda` | `GET /vagas/:id`, `POST /vagas/:id/reservar`, `POST /vagas/:id/libertar`, `GET /audit` |
+| `marcacoes` | `GET /audit` — contagens e vagas com mais de uma marcação (deve ser sempre 0) |
+| `utentes` | `GET /utentes/:numero` — nome e telemóvel mascarado |
+| `notificacoes` | `GET /sms/:marcacaoId`, `GET /stats` |
+
+Todos os serviços têm `GET /health` (vivo), `GET /ready` (dependências OK) e `GET /metrics` (Prometheus). Os registos são JSON numa linha, com o `x-request-id` propagado entre serviços.
+
+## Configuração
+
+Variáveis principais (valores por omissão do `compose.yaml`):
+
+| Variável | Serviço | Omissão | Efeito |
+|---|---|---|---|
+| `GATEWAY_PORT` | gateway | `8081` | Porta exposta no anfitrião |
+| `TIMEOUT_MS` / `RETRIES` | marcacoes | `300` / `2` | Timeout por tentativa e retries para utentes e agenda |
+| `OUTBOX_INTERVAL_MS` | marcacoes | `2000` | Intervalo do ciclo que republica confirmações pendentes |
+| `SEED_DIAS` | agenda | `2026-12-02,2026-12-03` | Dias com vagas criadas no arranque |
+| `RESERVA_DELAY_MS` | agenda | `0` | Atraso artificial na reserva (testes de timeouts) |
+| `UTENTES_SEED` | utentes | `1000` | Utentes fictícios criados no arranque |
+| `SMS_DELAY_MS` / `SMS_FAIL_RATE` | notificacoes | `0` / `0` | Operadora de SMS lenta ou com falhas |
+| `POSTGRES_PASSWORD`, `MSSQL_SA_PASSWORD`, `RABBITMQ_PASSWORD` | — | valores de desenvolvimento | Credenciais (Secrets no Kubernetes) |
+
+## Testes
+
+```bash
+bash testes/e2e.sh              # sobe o Compose, corre o teste e grava resultados/e2e-<data>.txt
+LIMPAR=1 bash testes/e2e.sh     # começa de volumes vazios
+```
+
+O teste de ponta a ponta corre num contentor `node:22-alpine` ligado à rede e entra pela gateway, como um utente. Cobre:
+
+- consulta de vagas, marcação, desmarcação e validações;
+- idempotência (pedido repetido, chave reutilizada, 20 pedidos simultâneos com a mesma chave);
+- **100 utentes em simultâneo na mesma vaga**: exatamente um 201, 99 × 409, nenhuma vaga duplicada;
+- confirmação por SMS, uma por marcação;
+- marcar com o RabbitMQ parado e confirmar que o SMS chega quando ele volta.
 
 ## Requisitos
 
@@ -65,69 +179,36 @@ O `UPDATE` condicional garante que só um pedido muda a vaga de `livre` para `ma
 | RNF4 | Confirmação entregue pelo menos uma vez, sem duplicar | consumidor idempotente |
 | RNF5 | Dados de utentes só acessíveis ao serviço `utentes` | NetworkPolicy e Secret |
 
-## Experiências
-
-Cada experiência segue o método da engenharia do caos (estado estacionário, hipótese, injeção, medição) e corre com o mesmo cenário k6 do pico das 08:00.
-
-| ID | Hipótese | Injeção | Métrica |
-|---|---|---|---|
-| E1 | Nenhuma vaga é marcada duas vezes | 300 VU na mesma vaga | duplicados |
-| E2 | Retries sem idempotência duplicam marcações | atraso de 400 ms na agenda | marcações por utente |
-| E3 | O HPA escala de 2 para 4+ réplicas em menos de 2 min | rampa de 0 a 300 VU | réplicas, p95 |
-| E4 | Perder Pods da agenda não viola o SLO | apagar Pods sob carga | % 5xx, orçamento de erro |
-| E5 | Sem RabbitMQ as marcações continuam | parar o RabbitMQ 2 min | marcações, fila |
-| E6 | A réplica mostra vagas já ocupadas por instantes | carga de escrita | atraso de replicação |
-| E7 | Só o serviço `utentes` chega ao SQL Server | Pod de teste com `sqlcmd` | ligação recusada |
-| E8 | O painel deteta o SQL Server em baixo em menos de 1 min | escalar o SQL Server a 0 | tempo até ao alerta |
-
 ## Estrutura
 
 ```
 .
-├── compose.yaml         a aplicação completa em Docker Compose (S8)
-├── gateway/             nginx com as rotas do Ingress (entrada do Compose)
+├── compose.yaml         a aplicação completa em Docker Compose
+├── gateway/             nginx com as mesmas rotas do Ingress
 ├── servicos/            agenda, marcacoes, utentes, notificacoes (Node.js 22 + Express)
+├── sql/                 esquemas e consultas
 ├── testes/              teste de ponta a ponta
+├── carga/               cenários de carga k6
+├── caos/                injeção de falhas
 ├── k8s/
 │   ├── base/            deployments, services, ingress
 │   ├── dados/           postgres, sqlserver, rabbitmq
 │   ├── observabilidade/ prometheus, grafana, exporter
 │   └── seguranca/       networkpolicy, rbac
-├── sql/                 esquemas e consultas às DMV
-├── carga/               cenários k6
-├── caos/                scripts das experiências E1 a E8
-└── resultados/          csv e capturas
+└── resultados/          relatórios dos testes
 ```
 
-As pastas vão sendo preenchidas ao longo do cronograma.
+## Roteiro
 
-## Correr em Docker Compose
+- [x] Quatro serviços, Docker Compose e teste de ponta a ponta
+- [ ] Kubernetes (k3d): Deployments, Ingress, Postgres, SQL Server
+- [ ] Réplica de leitura do Postgres para a consulta de disponibilidade
+- [ ] Cenário de carga do pico das 08:00 (k6, 300 VU)
+- [ ] Observabilidade: Prometheus, Grafana, alertas de SLO, exporter do SQL Server
+- [ ] Escalamento automático (HPA) e sondas
+- [ ] Segurança: NetworkPolicy, Secrets, RBAC
+- [ ] Testes de resiliência: perda de Pods, broker em baixo, base de dados em baixo
 
-```bash
-docker compose up -d --build --wait      # ~20 s depois do primeiro build
-curl 'http://localhost:8081/agenda?especialidade=CARD&dia=2026-12-02'
-curl -X POST http://localhost:8081/marcacoes -H 'content-type: application/json' \
-     -H "Idempotency-Key: $(uuidgen)" -d '{"utente":"100000001","vagaId":"V-2026-12-02-CARD-0815"}'
-bash testes/e2e.sh                       # teste de ponta a ponta; relatório em resultados/
-docker compose down -v                   # para tudo e apaga os dados
-```
+## Licença
 
-A gateway usa a porta 8081 porque a 8080 fica para o load balancer do k3d. No arranque, a agenda cria as vagas de 02/12 e 03/12 (4 especialidades × 16 horários) e o serviço `utentes` cria 1000 utentes fictícios (`100000001` a `100001000`).
-
-O teste de ponta a ponta (`testes/e2e.sh`) cobre RF1 a RF4, a idempotência, 100 utentes em simultâneo na mesma vaga (RNF1) e uma versão curta da E5 (marcar com o RabbitMQ parado e confirmar que o SMS chega quando ele volta).
-
-## Cronograma
-
-| Semana | Data | Trabalho | Tema |
-|---|---|---|---|
-| S8 | 04/11 | Enunciado; imagens dos 4 serviços e Compose | T02 |
-| S9 | 11/11 | Kubernetes: Deployments, Ingress, Postgres, SQL Server | T03 |
-| S10 | 18/11 | Timeouts, retries, idempotência, RabbitMQ · E2, E5 | T04 |
-| S11 | 25/11 | UPDATE condicional, réplica, k6 · E1, E6 | T05 |
-| S12 | 02/12 | Prometheus, Grafana, SLO, HPA, sondas, exporter SQL · E3, E4, E8 | T06 |
-| S13 | 09/12 | NetworkPolicy, Secrets, RBAC · E7; fecho e ensaio | T06 |
-| S14 | 16/12 | Defesa: demonstração ao vivo | — |
-
-## Ambiente
-
-Windows 11 + WSL2 Ubuntu + Docker Desktop, kubectl, k3d (k3s), Helm, k6. Todos os comandos correm no terminal Ubuntu.
+[MIT](LICENSE) · Avelino Almeida, 2026
