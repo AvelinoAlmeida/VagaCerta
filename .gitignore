@@ -1,0 +1,9 @@
+# materiais de trabalho locais (caderno, protótipo, relatório): não são publicados
+docs/
+
+node_modules/
+*.zip
+*.pdf
+*.log
+.vscode/
+.DS_Store
