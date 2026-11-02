@@ -1,0 +1,16 @@
+{
+  "name": "vagacerta-notificacoes",
+  "version": "0.1.0",
+  "description": "notificacoes: consumidor de marcacao.criada, SMS simulado",
+  "main": "src/index.js",
+  "private": true,
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "amqplib": "^0.10.8",
+    "express": "^5.1.0",
+    "pg": "^8.16.0",
+    "prom-client": "^15.1.3"
+  }
+}

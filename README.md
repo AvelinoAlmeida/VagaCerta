@@ -84,7 +84,10 @@ Cada experiência segue o método da engenharia do caos (estado estacionário, h
 
 ```
 .
-├── servicos/            agenda, marcacoes, utentes, notificacoes
+├── compose.yaml         a aplicação completa em Docker Compose (S8)
+├── gateway/             nginx com as rotas do Ingress (entrada do Compose)
+├── servicos/            agenda, marcacoes, utentes, notificacoes (Node.js 22 + Express)
+├── testes/              teste de ponta a ponta
 ├── k8s/
 │   ├── base/            deployments, services, ingress
 │   ├── dados/           postgres, sqlserver, rabbitmq
@@ -97,6 +100,21 @@ Cada experiência segue o método da engenharia do caos (estado estacionário, h
 ```
 
 As pastas vão sendo preenchidas ao longo do cronograma.
+
+## Correr em Docker Compose
+
+```bash
+docker compose up -d --build --wait      # ~20 s depois do primeiro build
+curl 'http://localhost:8081/agenda?especialidade=CARD&dia=2026-12-02'
+curl -X POST http://localhost:8081/marcacoes -H 'content-type: application/json' \
+     -H "Idempotency-Key: $(uuidgen)" -d '{"utente":"100000001","vagaId":"V-2026-12-02-CARD-0815"}'
+bash testes/e2e.sh                       # teste de ponta a ponta; relatório em resultados/
+docker compose down -v                   # para tudo e apaga os dados
+```
+
+A gateway usa a porta 8081 porque a 8080 fica para o load balancer do k3d. No arranque, a agenda cria as vagas de 02/12 e 03/12 (4 especialidades × 16 horários) e o serviço `utentes` cria 1000 utentes fictícios (`100000001` a `100001000`).
+
+O teste de ponta a ponta (`testes/e2e.sh`) cobre RF1 a RF4, a idempotência, 100 utentes em simultâneo na mesma vaga (RNF1) e uma versão curta da E5 (marcar com o RabbitMQ parado e confirmar que o SMS chega quando ele volta).
 
 ## Cronograma
 

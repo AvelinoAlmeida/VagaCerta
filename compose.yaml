@@ -1,0 +1,133 @@
+# VagaCerta em Docker Compose (S8). Arranque:  docker compose up -d --build --wait
+# Entrada: http://localhost:8081  (GET /agenda, POST /marcacoes)   RabbitMQ: http://localhost:15672 (app/app)
+# As palavras-passe têm valores por omissão só para desenvolvimento local; no Kubernetes passam a Secrets (S13).
+name: vagacerta
+
+x-node: &node
+  restart: unless-stopped
+  environment: &node-env
+    LOG_LEVEL: info
+  healthcheck: &node-health
+    test: ["CMD-SHELL", "wget -qO- http://localhost:$${PORT}/ready || exit 1"]
+    interval: 3s
+    timeout: 2s
+    retries: 40
+    start_period: 5s
+
+services:
+  gateway:
+    image: nginx:alpine
+    ports: ["${GATEWAY_PORT:-8081}:8080"] # 8081: a 8080 fica para o load balancer do k3d
+    volumes:
+      - ./gateway/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      agenda: { condition: service_healthy }
+      marcacoes: { condition: service_healthy }
+    restart: unless-stopped
+
+  agenda:
+    <<: *node
+    build: ./servicos/agenda
+    image: vagacerta/agenda:0.1
+    environment:
+      <<: *node-env
+      PORT: 3001
+      DATABASE_URL: postgres://app:${POSTGRES_PASSWORD:-app}@postgres:5432/agenda
+      SEED_DIAS: 2026-12-02,2026-12-03
+      RESERVA_DELAY_MS: ${RESERVA_DELAY_MS:-0}
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  marcacoes:
+    <<: *node
+    build: ./servicos/marcacoes
+    image: vagacerta/marcacoes:0.1
+    environment:
+      <<: *node-env
+      PORT: 3002
+      DATABASE_URL: postgres://app:${POSTGRES_PASSWORD:-app}@postgres:5432/marcacoes
+      RABBITMQ_URL: amqp://app:${RABBITMQ_PASSWORD:-app}@rabbitmq:5672
+      AGENDA_URL: http://agenda:3001
+      UTENTES_URL: http://utentes:3003
+      TIMEOUT_MS: 300
+      RETRIES: 2
+    depends_on:
+      postgres: { condition: service_healthy }
+      agenda: { condition: service_healthy }
+      utentes: { condition: service_healthy }
+
+  utentes:
+    <<: *node
+    build: ./servicos/utentes
+    image: vagacerta/utentes:0.1
+    environment:
+      <<: *node-env
+      PORT: 3003
+      MSSQL_HOST: sqlserver
+      MSSQL_USER: sa
+      MSSQL_PASSWORD: ${MSSQL_SA_PASSWORD:-VagaCerta#2026}
+      UTENTES_SEED: 1000
+    depends_on:
+      sqlserver: { condition: service_started }
+
+  notificacoes:
+    <<: *node
+    build: ./servicos/notificacoes
+    image: vagacerta/notificacoes:0.1
+    environment:
+      <<: *node-env
+      PORT: 3004
+      DATABASE_URL: postgres://app:${POSTGRES_PASSWORD:-app}@postgres:5432/notificacoes
+      RABBITMQ_URL: amqp://app:${RABBITMQ_PASSWORD:-app}@rabbitmq:5672
+    healthcheck:
+      <<: *node-health
+      test: ["CMD", "wget", "-qO-", "http://localhost:3004/health"] # sem RabbitMQ fica not ready, mas está vivo
+    depends_on:
+      postgres: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
+
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-app}
+    volumes:
+      - ./sql/postgres-init.sql:/docker-entrypoint-initdb.d/01-bases.sql:ro
+      - postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d notificacoes"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+    restart: unless-stopped
+
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: Developer
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:-VagaCerta#2026}
+    volumes:
+      - sqlserver:/var/opt/mssql
+    restart: unless-stopped
+
+  rabbitmq:
+    image: rabbitmq:4-management-alpine
+    hostname: rabbitmq # o nome do nó (e os dados no volume) dependem do hostname
+    environment:
+      RABBITMQ_DEFAULT_USER: app
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-app}
+    ports: ["15672:15672"]
+    volumes:
+      - rabbitmq:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    restart: unless-stopped
+
+volumes:
+  postgres:
+  sqlserver:
+  rabbitmq:

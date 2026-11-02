@@ -1,0 +1,15 @@
+{
+  "name": "vagacerta-utentes",
+  "version": "0.1.0",
+  "description": "utentes: dados pessoais no SQL Server",
+  "main": "src/index.js",
+  "private": true,
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "express": "^5.1.0",
+    "mssql": "^11.0.1",
+    "prom-client": "^15.1.3"
+  }
+}
